@@ -1,5 +1,5 @@
 # Database settings
-DB_PATH = "/opt/megalohobot/db.sqlite"
+DB_PATH = ".db.sqlite"
 
 # Events settings
 DEFAULT_REMIND_TZ = 3  # Hours from UTC TZ

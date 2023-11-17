@@ -1,0 +1,48 @@
+from telegram import Bot
+import requests
+import schedule
+import time
+from dotenv import load_dotenv
+import datetime
+import os
+load_dotenv()
+
+
+bot = Bot(os.getenv('TOKEN'))
+API_TOKEN = Bot(os.getenv("MLB_TELEGRAM_TOKEN"))
+# chat_id = os.getenv('CHAT_ID')
+BOT_OWNER_ID = int(os.getenv("MLB_TELEGRAM_BOT_OWNER"))
+URL_TDA = os.getenv('URL_TDA')
+URL_YDA = os.getenv('URL_YDA')
+
+
+def get_sun():
+    day_length_today = datetime.datetime.strptime(
+        requests.get(URL_TDA).json()['results']['day_length'], '%H:%M:%S'
+    )
+    day_length_yda = datetime.datetime.strptime(
+        requests.get(URL_YDA).json()['results']['day_length'],  '%H:%M:%S'
+    )
+    day_length = (((day_length_today-day_length_yda).total_seconds())/60)
+    if day_length < 0:
+        message = (
+            f'Сегодня день стал короче на {abs(round(day_length, 2))} минуты'
+        )
+    if day_length > 0:
+        message = (
+            f'+{abs(round(day_length, 2))} к световому дню! '
+        )
+    if day_length == 0:
+        message = ('А у нас дни солнцестояния!')
+    return API_TOKEN.send_message(BOT_OWNER_ID, message)
+
+
+def timer_say():
+    schedule.every().day.at('17:13').do(get_sun)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+if __name__ == "__main__":
+    timer_say()
+
