@@ -1,11 +1,13 @@
+import time
 from datetime import datetime, timedelta
 from os import getenv
 
+import requests
+import schedule
 from dotenv import load_dotenv
 from requests import get
-from telegram import Update
-from telegram.ext import CallbackContext
-from telegram.ext import Updater, CommandHandler, JobQueue
+from telegram import Bot, Update
+from telegram.ext import CallbackContext, CommandHandler, JobQueue, Updater
 
 import settings
 from db import MegalohobotDB
@@ -13,9 +15,42 @@ from structures import Chat, Event
 
 # All confidential info is stored as environment vars
 load_dotenv(".env")
+bot = Bot(getenv('TOKEN'))
 API_TOKEN = getenv("MLB_TELEGRAM_TOKEN")
 BOT_NAME = "@" + getenv("MLB_BOT_NAME")
 BOT_OWNER_ID = int(getenv("MLB_TELEGRAM_BOT_OWNER"))
+URL_TDA = getenv('URL_TDA')
+URL_YDA = getenv('URL_YDA')
+
+
+def get_sun():
+    """Расчет светового длины дня"""
+    day_length_today = datetime.strptime(
+        requests.get(URL_TDA).json()['results']['day_length'], '%H:%M:%S'
+    )
+    day_length_yda = datetime.strptime(
+        requests.get(URL_YDA).json()['results']['day_length'],  '%H:%M:%S'
+    )
+    day_length = (((day_length_today-day_length_yda).total_seconds())/60)
+    if day_length < 0:
+        message = (
+            f'Сегодня день стал короче на {abs(round(day_length, 2))} минуты'
+        )
+    if day_length > 0:
+        message = (
+            f'+{abs(round(day_length, 2))} к световому дню! '
+        )
+    if day_length == 0:
+        message = ('А у нас дни солнцестояния!')
+    return bot.send_message(BOT_OWNER_ID, message)
+
+
+def timer_say():
+    """Запуск ежедневного сообщения об изменении светового дня"""
+    schedule.every().day.at('06:01').do(get_sun)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 def _get_text_from_say_command(update: Update):
@@ -262,6 +297,7 @@ def main():
 
     # Starting bot
     updater.start_polling(drop_pending_updates=True)
+    updater.running(timer_say())
     updater.idle()
 
 
